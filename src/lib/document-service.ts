@@ -54,13 +54,13 @@ export class DocumentService {
     try {
       const fileName = `${userId}/${Date.now()}-${file.name}`;
       const { data, error } = await storage
-        .from('documents')
+        .from('document')
         .upload(fileName, file);
 
       if (error) throw error;
 
       const { data: urlData } = storage
-        .from('documents')
+        .from('document')
         .getPublicUrl(fileName);
 
       // Insert file record into database

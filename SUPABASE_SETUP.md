@@ -42,36 +42,36 @@ NODE_ENV=development
 ## 5. Set Up Storage
 
 1. In your Supabase dashboard, go to Storage
-2. Create a new bucket called `documents`
+2. Create a new bucket called `document`
 3. Set the bucket to private
-4. Create a storage policy for the `documents` bucket:
+4. Create a storage policy for the `document` bucket:
 
 ```sql
 -- Allow users to upload files to their own folder
 CREATE POLICY "Users can upload files" ON storage.objects
 FOR INSERT WITH CHECK (
-  bucket_id = 'documents' AND 
+  bucket_id = 'document' AND 
   auth.uid()::text = (storage.foldername(name))[1]
 );
 
 -- Allow users to view their own files
 CREATE POLICY "Users can view their own files" ON storage.objects
 FOR SELECT USING (
-  bucket_id = 'documents' AND 
+  bucket_id = 'document' AND 
   auth.uid()::text = (storage.foldername(name))[1]
 );
 
 -- Allow users to update their own files
 CREATE POLICY "Users can update their own files" ON storage.objects
 FOR UPDATE USING (
-  bucket_id = 'documents' AND 
+  bucket_id = 'document' AND 
   auth.uid()::text = (storage.foldername(name))[1]
 );
 
 -- Allow users to delete their own files
 CREATE POLICY "Users can delete their own files" ON storage.objects
 FOR DELETE USING (
-  bucket_id = 'documents' AND 
+  bucket_id = 'document' AND 
   auth.uid()::text = (storage.foldername(name))[1]
 );
 ```
