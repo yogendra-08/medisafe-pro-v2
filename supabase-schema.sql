@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS documents (
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   summary TEXT,
   document_type VARCHAR(50),
+  tags TEXT[],
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

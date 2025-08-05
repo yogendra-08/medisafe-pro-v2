@@ -10,9 +10,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "./ui/button";
-import { UploadCloud, File as FileIcon, Loader2 } from "lucide-react";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Textarea } from "./ui/textarea";
+import { UploadCloud, File as FileIcon, Loader2, X } from "lucide-react";
 import React from "react";
-import { processDocument } from "@/lib/actions";
 import { DocumentService } from "@/lib/document-service";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -27,6 +29,9 @@ export function UploadDialog({ children, onDocumentUploaded }: UploadDialogProps
   const [file, setFile] = React.useState<File | null>(null);
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [isOpen, setIsOpen] = React.useState(false);
+  const [description, setDescription] = React.useState("");
+  const [tags, setTags] = React.useState("");
+  const [documentType, setDocumentType] = React.useState("");
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -59,79 +64,77 @@ export function UploadDialog({ children, onDocumentUploaded }: UploadDialogProps
         throw new Error("Failed to upload file to storage");
       }
 
-      // Process document with AI
-      const result = await processDocument(null, {
-        fileName: file.name,
-        fileContent: `data:${file.type};base64,${await fileToBase64(file)}`,
+      // Create document record in database with manual inputs
+      const document = await DocumentService.createDocument({
+        fileId: uploadResult.fileId,
+        userId: user.id,
+        summary: description || undefined,
+        documentType: documentType || undefined,
+        tags: tags ? tags.split(",").map(tag => tag.trim()) : undefined,
       });
 
-      if (result.success && result.document) {
-        // Create document record in database
-        const document = await DocumentService.createDocument({
-          fileId: uploadResult.fileId,
-          userId: user.id,
-          summary: result.document.summary,
-          documentType: result.document.type,
+      if (document) {
+        // Create document object for UI
+        const newDoc: Document = {
+          id: document.id,
+          name: file.name,
+          type: documentType as Document["type"] || "other",
+          uploadDate: new Date().toISOString().split("T")[0],
+          summary: description,
+          content: "", // We don't store full content in UI state
+          tags: tags ? tags.split(",").map(tag => tag.trim()) : [],
+        };
+
+        onDocumentUploaded(newDoc);
+        toast({
+          title: "Upload Successful",
+          description: `${file.name} has been uploaded to your secure storage.`,
         });
-
-        if (document) {
-          // Create document object for UI
-          const newDoc: Document = {
-            ...result.document,
-            id: document.id,
-          };
-
-          onDocumentUploaded(newDoc);
-          toast({
-            title: "Upload Successful",
-            description: `${file.name} has been processed and uploaded to your secure storage.`,
-          });
-          setFile(null);
-          setIsOpen(false);
-        } else {
-          throw new Error("Failed to create document record");
-        }
+        
+        // Reset form
+        setFile(null);
+        setDescription("");
+        setTags("");
+        setDocumentType("");
+        setIsOpen(false);
       } else {
-        throw new Error(result.message || "An unknown error occurred during processing.");
+        throw new Error("Failed to create document record");
       }
     } catch (error) {
-      console.error("Error processing document:", error);
+      console.error("Error uploading document:", error);
       toast({
         variant: "destructive",
         title: "Upload Failed",
         description:
           (error as Error).message ||
-          "There was an error processing your document.",
+          "There was an error uploading your document.",
       });
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => {
-        const base64 = reader.result as string;
-        // Remove data URL prefix (e.g., "data:application/pdf;base64,")
-        const base64Data = base64.split(',')[1];
-        resolve(base64Data);
-      };
-      reader.onerror = error => reject(error);
-    });
+  const handleClose = () => {
+    setIsOpen(false);
+    setFile(null);
+    setDescription("");
+    setTags("");
+    setDocumentType("");
   };
   
   React.useEffect(() => {
     if (!isOpen) {
       setFile(null);
+      setDescription("");
+      setTags("");
+      setDocumentType("");
     }
   }, [isOpen]);
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Upload Document</DialogTitle>
           <DialogDescription>
@@ -154,14 +157,14 @@ export function UploadDialog({ children, onDocumentUploaded }: UploadDialogProps
                 onClick={() => setFile(null)}
                 disabled={isProcessing}
               >
-                <UploadCloud className="h-4 w-4" />
+                <X className="h-4 w-4" />
               </Button>
             </div>
           ) : (
             <div className="flex items-center justify-center w-full">
               <label
                 htmlFor="dropzone-file"
-                className="flex flex-col items-center justify-center w-full h-64 border-2 border-border border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted"
+                className="flex flex-col items-center justify-center w-full h-32 border-2 border-border border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted"
               >
                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
                   <UploadCloud className="w-8 h-8 mb-4 text-muted-foreground" />
@@ -184,17 +187,60 @@ export function UploadDialog({ children, onDocumentUploaded }: UploadDialogProps
               </label>
             </div>
           )}
+
+          {file && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="document-type">Document Type (Optional)</Label>
+                <Input
+                  id="document-type"
+                  placeholder="e.g., Lab Report, Prescription, Medical Record"
+                  value={documentType}
+                  onChange={(e) => setDocumentType(e.target.value)}
+                  disabled={isProcessing}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description">Description (Optional)</Label>
+                <Textarea
+                  id="description"
+                  placeholder="Add a description or notes about this document..."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  disabled={isProcessing}
+                  rows={3}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="tags">Tags (Optional)</Label>
+                <Input
+                  id="tags"
+                  placeholder="e.g., blood test, cardiology, 2024 (comma separated)"
+                  value={tags}
+                  onChange={(e) => setTags(e.target.value)}
+                  disabled={isProcessing}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Separate tags with commas
+                </p>
+              </div>
+            </div>
+          )}
         </div>
         <DialogFooter>
-          <Button onClick={() => setIsOpen(false)} variant="outline" disabled={isProcessing}>Cancel</Button>
+          <Button onClick={handleClose} variant="outline" disabled={isProcessing}>
+            Cancel
+          </Button>
           <Button onClick={handleUpload} disabled={!file || isProcessing}>
             {isProcessing ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Processing...
+                Uploading...
               </>
             ) : (
-              "Upload & Process"
+              "Upload Document"
             )}
           </Button>
         </DialogFooter>

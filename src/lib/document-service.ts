@@ -94,6 +94,7 @@ export class DocumentService {
     userId: string;
     summary?: string;
     documentType?: string;
+    tags?: string[];
   }): Promise<Document | null> {
     try {
       const { data: document, error } = await supabase
@@ -103,6 +104,7 @@ export class DocumentService {
           user_id: data.userId,
           summary: data.summary,
           document_type: data.documentType,
+          tags: data.tags,
         })
         .select()
         .single();

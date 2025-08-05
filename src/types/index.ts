@@ -5,4 +5,5 @@ export type Document = {
   uploadDate: string;
   summary: string;
   content: string;
+  tags?: string[];
 };
