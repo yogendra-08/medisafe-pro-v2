@@ -64,6 +64,7 @@ import { Badge } from "@/components/ui/badge";
 import { UploadDialog } from "@/components/upload-dialog";
 import { DocumentService } from "@/lib/document-service";
 import { useAuth } from "@/hooks/use-auth";
+import { ErrorBoundary } from "@/components/error-boundary";
 import Link from "next/link";
 
 const mockDocuments: Document[] = [
@@ -209,9 +210,10 @@ export default function DashboardPage() {
 
 
   const filteredDocuments = documents
-    .filter((doc) =>
-      doc.name.toLowerCase().includes(searchTerm.toLowerCase())
-    )
+    .filter((doc) => {
+      if (!doc || !doc.name) return false;
+      return doc.name.toLowerCase().includes(searchTerm.toLowerCase());
+    })
     .filter((doc) => typeFilter === "all" || doc.type === typeFilter);
 
   return (
@@ -219,11 +221,12 @@ export default function DashboardPage() {
       <AlertDialog open={!!docToDelete} onOpenChange={(open) => !open && setDocToDelete(null)}>
         <div className="flex min-h-screen w-full">
           <AppSidebar />
-          <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
-            <Header onSearchChange={setSearchTerm} onDocumentUploaded={handleDocumentUploaded} />
-            <HealthStats />
+          <ErrorBoundary>
+            <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
+              <Header onSearchChange={setSearchTerm} onDocumentUploaded={handleDocumentUploaded} />
+              <HealthStats />
 
-            <Card className="glassmorphism">
+              <Card className="glassmorphism">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
                   <CardTitle>My Health Records</CardTitle>
@@ -287,7 +290,23 @@ export default function DashboardPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredDocuments.map((doc) => (
+                    {isLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center py-8">
+                          <div className="flex items-center justify-center">
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                            <span className="ml-2">Loading documents...</span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : filteredDocuments.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                          No documents found. Upload your first document to get started.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredDocuments.map((doc) => (
                       <TableRow key={doc.id}>
                         <TableCell>
                            <Link href={`/documents/${doc.id}`} className="font-medium hover:underline">{doc.name}</Link>
@@ -334,12 +353,14 @@ export default function DashboardPage() {
                           </DropdownMenu>
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ))
+                  )}
                   </TableBody>
                 </Table>
               </CardContent>
             </Card>
-          </main>
+            </main>
+          </ErrorBoundary>
         </div>
         <AlertDialogContent>
             <AlertDialogHeader>

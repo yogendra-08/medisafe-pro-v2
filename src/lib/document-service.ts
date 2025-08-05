@@ -5,6 +5,26 @@ import { supabase, storage } from './supabase';
 import type { Document, File } from './supabase';
 
 export class DocumentService {
+  // Helper function to map document type to valid Document type
+  private static mapDocumentType(type: string | null | undefined): Document['type'] {
+    if (!type) return 'Other';
+    
+    const normalizedType = type.trim();
+    switch (normalizedType.toLowerCase()) {
+      case 'lab report':
+      case 'lab':
+        return 'Lab Report';
+      case 'prescription':
+      case 'prescription':
+        return 'Prescription';
+      case 'invoice':
+      case 'bill':
+        return 'Invoice';
+      default:
+        return 'Other';
+    }
+  }
+
   // Get all documents for a user
   static async getDocuments(userId: string): Promise<Document[]> {
     try {
@@ -25,7 +45,17 @@ export class DocumentService {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data || [];
+      
+      // Map database fields to Document interface
+      return (data || []).map((doc: any) => ({
+        id: doc.id,
+        name: doc.files?.name || 'Unknown Document',
+        type: this.mapDocumentType(doc.document_type),
+        uploadDate: doc.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
+        summary: doc.summary || '',
+        content: '', // We don't store full content in the database
+        tags: doc.tags || [],
+      }));
     } catch (error) {
       console.error('Error fetching documents:', error);
       return [];
@@ -106,11 +136,33 @@ export class DocumentService {
           document_type: data.documentType,
           tags: data.tags,
         })
-        .select()
+        .select(`
+          *,
+          files (
+            id,
+            name,
+            url,
+            size,
+            mime_type,
+            document_type
+          )
+        `)
         .single();
 
       if (error) throw error;
-      return document;
+      
+      if (!document) return null;
+      
+      // Map database fields to Document interface
+      return {
+        id: document.id,
+        name: document.files?.name || 'Unknown Document',
+        type: this.mapDocumentType(document.document_type),
+        uploadDate: document.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
+        summary: document.summary || '',
+        content: '', // We don't store full content in the database
+        tags: document.tags || [],
+      };
     } catch (error) {
       console.error('Error creating document:', error);
       return null;
@@ -201,7 +253,19 @@ export class DocumentService {
         .single();
 
       if (error) throw error;
-      return data;
+      
+      if (!data) return null;
+      
+      // Map database fields to Document interface
+      return {
+        id: data.id,
+        name: data.files?.name || 'Unknown Document',
+        type: this.mapDocumentType(data.document_type),
+        uploadDate: data.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
+        summary: data.summary || '',
+        content: '', // We don't store full content in the database
+        tags: data.tags || [],
+      };
     } catch (error) {
       console.error('Error fetching document:', error);
       return null;

@@ -74,18 +74,8 @@ export function UploadDialog({ children, onDocumentUploaded }: UploadDialogProps
       });
 
       if (document) {
-        // Create document object for UI
-        const newDoc: Document = {
-          id: document.id,
-          name: file.name,
-          type: documentType as Document["type"] || "other",
-          uploadDate: new Date().toISOString().split("T")[0],
-          summary: description,
-          content: "", // We don't store full content in UI state
-          tags: tags ? tags.split(",").map(tag => tag.trim()) : [],
-        };
-
-        onDocumentUploaded(newDoc);
+        // The document service now returns the properly mapped Document object
+        onDocumentUploaded(document);
         toast({
           title: "Upload Successful",
           description: `${file.name} has been uploaded to your secure storage.`,
